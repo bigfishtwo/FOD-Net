@@ -13,3 +13,7 @@ year={2021},
 publisher={Cold Spring Harbor Laboratory}
 }
 ```
+
+------
+
+Basically I added the train phase code. Since the patch-wise input is hard to load with torch.utils.data.DataLoader, I wrote my own dataoloder, which achives loading a FOD subject to GPU and feeding the model batch-wise patches.
