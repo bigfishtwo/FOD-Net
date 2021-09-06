@@ -25,7 +25,7 @@ class fodnetModel():
 
     """
     def __init__(self, gpu_id):
-        """Initialize the SMC GAN class.
+        """Initialize.
 
         Parameters:
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
@@ -39,6 +39,27 @@ class fodnetModel():
 
         # define networks
         self.net = networks.define_network(device=self.device)
+        
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', verbose=True)
+        self.criterion = torch.nn.MSELoss()
+
+        stats = np.load('/home/lenovo/Desktop/data/stats.npz') #/home/zjy/code/stats.npz
+        self.fodmt_mean = stats['mean'].astype(np.float32).reshape((1,45))
+        self.fodmt_std = stats['std'].astype(np.float32).reshape((1,45))
+        self.fodmt_mean = torch.from_numpy(self.fodmt_mean).to(self.device)
+        self.fodmt_std = torch.from_numpy(self.fodmt_std).to(self.device)
+
+        self.fodlr_mean = stats['means'].astype(np.float32).reshape((1, 45))
+        self.fodlr_std = stats['stds'].astype(np.float32).reshape((1, 45))
+        self.fodlr_mean = torch.from_numpy(self.fodlr_mean).to(self.device)
+        self.fodlr_std = torch.from_numpy(self.fodlr_std).to(self.device)
+
+        # initialization Xavier
+        for m in self.net.modules():
+            if isinstance(m, (torch.nn.Conv3d, torch.nn.Linear)):
+                torch.nn.init.xavier_uniform_(m.weight)
+
 
     def set_input(self, fodlr, brain_mask, fod_affine, act_mask):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -193,3 +214,21 @@ class fodnetModel():
             self.__patch_instance_norm_state_dict(state_dict, self.net, key.split('.'))
         self.net.load_state_dict(state_dict)
 
+    def suffering(self, phase, fodlr, fodmt):
+
+        # fodlr = fodlr.to(self.device)
+        # fodmt = fodmt.to(self.device)
+
+        self.optimizer.zero_grad()
+        with torch.set_grad_enabled(phase == 'train'):
+ 
+            fodpred = self.net(fodlr)
+            pred = fodpred  * self.fodmt_std + self.fodmt_mean
+            ground_truth = fodmt[:, :, self.size_3d_patch // 2, self.size_3d_patch // 2, self.size_3d_patch // 2]
+
+            loss = self.criterion(pred, ground_truth)
+            if phase == 'train':
+                loss.backward()
+                self.optimizer.step()
+           
+        return loss.item()
