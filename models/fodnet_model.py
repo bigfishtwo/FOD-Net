@@ -216,9 +216,6 @@ class fodnetModel():
 
     def suffering(self, phase, fodlr, fodmt):
 
-        # fodlr = fodlr.to(self.device)
-        # fodmt = fodmt.to(self.device)
-
         self.optimizer.zero_grad()
         with torch.set_grad_enabled(phase == 'train'):
  
